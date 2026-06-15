@@ -1,0 +1,12 @@
+# Never commit the multi-GB YugabyteDB release tarballs
+*.tar.gz
+yugabytedb-master/
+db/*.tar.gz
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local env
+.env

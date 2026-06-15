@@ -1,0 +1,41 @@
+# Hybrid Graph RAG on YugabyteDB (master / 2026.1 line) with vector + MAGE.
+#
+# `db` runs a single-node YugabyteDB built from a native aarch64 master
+# tarball (see db/Dockerfile). `db-init` applies the schema once the database
+# is healthy. The Python demo (src/) talks to YSQL on localhost:5433.
+services:
+  db:
+    build:
+      context: ./db
+      args:
+        # Native aarch64 packaged release tarball (place it in ./db first —
+        # see db/README.md). Override to pin a different build.
+        YB_TARBALL: yugabyte-2026.1.0.0-b109-almalinux8-aarch64.tar.gz
+    image: yb-graphrag:2026.1.0.0-b109
+    hostname: db
+    command:
+      - yugabyted
+      - start
+      - --daemon=false
+      - --tserver_flags=ysql_yb_enable_mage=true
+      - --master_flags=ysql_yb_enable_mage=true
+    ports:
+      - "5433:5433"    # YSQL
+      - "15433:15433"  # YugabyteDB UI
+      - "7000:7000"    # master web UI
+    healthcheck:
+      test: ["CMD-SHELL", "ysqlsh -h $(hostname -i) -U yugabyte -c 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+  db-init:
+    image: yb-graphrag:2026.1.0.0-b109
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["ysqlsh", "-h", "db", "-U", "yugabyte", "-v", "ON_ERROR_STOP=1", "-f", "/sql/00_schema.sql"]
+    volumes:
+      - ./sql:/sql:ro
+    restart: "no"
