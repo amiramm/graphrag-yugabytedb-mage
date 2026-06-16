@@ -5,7 +5,7 @@
 > *requires* per-tenant properties (`meko_datapack_id`, `meko_user_id`,
 > `meko_agent_id`) on every vertex and edge — these are **not** part of
 > stock/GA MAGE. The demo is suitable for showing at DSS; before publishing as
-> a general blog, re-verify the cypher against a non-Meko MAGE build (the
+> a general blog, re-verify the Cypher against a non-Meko MAGE build (the
 > tenant props should then be unnecessary). See "Tenant properties" below.
 
 A small, **runnable** demo of *hybrid Graph RAG* on a single distributed SQL
@@ -19,7 +19,7 @@ database. It combines two retrievers over the same YugabyteDB instance:
 The two stores cross-reference each other: every graph `Entity` node carries the
 `chunk_id` it was extracted from, so a vector hit can pull in graph context and
 a graph walk can point back to source chunks. Fusing both is what gives a
-language model richer, more connected context than vector search alone.
+language model a richer, more connected context than vector search alone.
 
 > Why one database? Vector search and the knowledge graph live in the **same**
 > YugabyteDB cluster — no separate graph database, no second system to operate,
@@ -45,8 +45,8 @@ query ───▶  A) vector top-k  ─┐
 - Python 3.11+
 - *Optional:* AWS credentials with Amazon Bedrock access (in a region where
   `amazon.titan-embed-text-v2:0` and a Claude model are enabled, e.g.
-  `us-east-1`). With them the demo uses Titan V2 embeddings + Claude for entity
-  extraction; **without** them it falls back to a deterministic hash embedder
+  `us-east-1`). With them, the demo uses Titan V2 embeddings + Claude for entity
+  extraction; **without** them, it falls back to a deterministic hash embedder
   and a heuristic extractor, so the full vector + graph + fusion pipeline still
   runs offline. Configure with `AWS_REGION`, `BEDROCK_EMBED_MODEL`,
   `BEDROCK_LLM_MODEL` (see `src/common.py`).
