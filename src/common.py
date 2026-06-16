@@ -89,7 +89,7 @@ def _bedrock_client():
         sess = boto3.Session()
         if sess.get_credentials() is None:
             return None
-        region = os.environ.get("AWS_REGION") or sess.region_name or "us-east-1"
+        region = os.environ.get("BEDROCK_REGION") or "us-east-1"
         _bedrock = sess.client("bedrock-runtime", region_name=region)
     except Exception:
         _bedrock = None

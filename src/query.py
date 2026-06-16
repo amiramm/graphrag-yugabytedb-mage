@@ -48,7 +48,7 @@ def neighbors(cur, name: str) -> list[tuple[str, str]]:
     """One-hop neighbours of an entity: (relationship_type, neighbour_name)."""
     cur.execute(
         f"SELECT * FROM cypher('{GRAPH_NAME}', $q$ "
-        f'MATCH (a:Entity {{name: "{name}"}})-[r:RELATED_TO]-(b:Entity) '
+        f'MATCH (a:Entity {{name: "{name}"}})-[r]-(b:Entity) '
         "RETURN r.predicate, b.name $q$) AS (rel agtype, nbr agtype);"
     )
     return [(_unquote(r[0]), _unquote(r[1])) for r in cur.fetchall()]
