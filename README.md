@@ -1,5 +1,13 @@
 # Hybrid Graph RAG on YugabyteDB (2026.1) with pgvector + MAGE
 
+> ⚠️ **Status: demo-only, not yet publishable.** This runs against the
+> **Meko-customized** MAGE build of YugabyteDB 2026.1, whose graph engine
+> *requires* per-tenant properties (`meko_datapack_id`, `meko_user_id`,
+> `meko_agent_id`) on every vertex and edge — these are **not** part of
+> stock/GA MAGE. The demo is suitable for showing at DSS; before publishing as
+> a general blog, re-verify the cypher against a non-Meko MAGE build (the
+> tenant props should then be unnecessary). See "Tenant properties" below.
+
 A small, **runnable** demo of *hybrid Graph RAG* on a single distributed SQL
 database. It combines two retrievers over the same YugabyteDB instance:
 
@@ -81,9 +89,13 @@ This is worth knowing if you adapt the cypher:
   `mag_catalog` on the `search_path` — schema-qualifying them, or wrapping in
   an explicit `BEGIN/COMMIT`, raises *"Commit separate ddl txn called when not
   in a separate DDL transaction"*.
-- This build enforces **multi-tenancy in the engine**: every vertex *and* edge
-  must carry `meko_datapack_id`, `meko_user_id`, `meko_agent_id` (see
-  `tenant_props()` in `src/common.py`).
+- **Tenant properties (Meko build only).** This build enforces multi-tenancy
+  in the engine: every vertex *and* edge must carry `meko_datapack_id`,
+  `meko_user_id`, `meko_agent_id` (see `tenant_props()` in `src/common.py`).
+  These names are hard-coded in the compiled `mage.so` — there is no gflag to
+  disable the requirement. They are **specific to the Meko fork**; a stock/GA
+  MAGE build is not expected to require them, so on a non-Meko build you can
+  drop `tenant_props()` from the cypher entirely.
 - Only edge labels declared via `create_elabel` resolve, so all edges use the
   single `RELATED_TO` label and keep the real predicate as a property.
 

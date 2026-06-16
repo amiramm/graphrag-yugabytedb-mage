@@ -4,6 +4,11 @@
 The best retrieval does both — and with YugabyteDB 2026.1 you can do both in
 one distributed SQL database, no second system to operate.*
 
+> **Draft / not yet for publication.** The accompanying demo currently runs on a
+> Meko-customized MAGE build that requires per-tenant properties on every node
+> and edge. Those `meko_*` properties are Meko-specific and would be removed
+> before this is published against a stock/GA MAGE build of YugabyteDB 2026.1.
+
 ---
 
 ## The problem with vector-only RAG
