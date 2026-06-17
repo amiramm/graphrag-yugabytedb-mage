@@ -24,7 +24,7 @@ EMBED_DIM = 1024
 GRAPH_NAME = "knowledge_graph"
 BEDROCK_EMBED_MODEL = os.environ.get("BEDROCK_EMBED_MODEL", "amazon.titan-embed-text-v2:0")
 BEDROCK_LLM_MODEL = os.environ.get(
-    "BEDROCK_LLM_MODEL", "us.anthropic.claude-sonnet-4-6-20250930-v1:0"
+    "BEDROCK_LLM_MODEL", "us.anthropic.claude-sonnet-4-6"
 )
 
 # YugabyteDB 2026.1's MAGE build enforces multi-tenancy in the engine: every
@@ -164,3 +164,48 @@ def _heuristic_triples(text: str) -> list[dict[str, str]]:
         for i in range(len(ents) - 1):
             triples.append({"subject": ents[i], "predicate": "RELATED_TO", "object": ents[i + 1]})
     return triples
+
+
+def query_entities(question: str) -> list[str]:
+    """Entities mentioned in a *question*, for query-anchored graph retrieval.
+
+    We reuse `extract_triples` (Bedrock in cloud mode, regex heuristic offline)
+    and flatten its subjects + objects into a deduped, order-preserving list.
+    These are the anchors we look up in the graph to re-rank vector hits by
+    proximity to what the question is actually about. Returns [] when nothing
+    is found, so the caller degrades gracefully to pure vector order.
+    """
+    seen: set[str] = set()
+    anchors: list[str] = []
+    for t in extract_triples(question):
+        for name in (t.get("subject"), t.get("object")):
+            if name and name not in seen:
+                seen.add(name)
+                anchors.append(name)
+    return anchors
+
+
+# --------------------------------------------------------------------------
+# RAG answer generation
+# --------------------------------------------------------------------------
+RAG_PROMPT = """Answer the question using ONLY the provided context.
+If the context does not contain enough information, say so briefly.
+
+Context:
+%s
+
+Question: %s"""
+
+
+def answer_with_context(question: str, context: str) -> str | None:
+    """Return an LLM answer grounded in the fused retrieval context, or None offline."""
+    bc = _bedrock_client()
+    if bc is None:
+        return None
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 1024,
+        "messages": [{"role": "user", "content": RAG_PROMPT % (context, question)}],
+    }
+    resp = bc.invoke_model(modelId=BEDROCK_LLM_MODEL, body=json.dumps(body))
+    return json.loads(resp["body"].read())["content"][0]["text"]

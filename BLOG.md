@@ -57,10 +57,15 @@ SQL.
             │  knowledge_graph:  (:Entity {name})-[:RELATED_TO]->(:Entity)        │
             │                      ▲ each node tagged with its source chunk_id    │
             └─────────────────────────────────────────── MAGE ───────────────────┘
- query ──▶  A) vector top-k ─┐
-                             ├─▶ fuse ─▶ context for the LLM
-            B) graph 1-hop ──┘
+ query ──▶  A) vector over-fetch (candidates) ─┐
+           B) graph proximity to the          ├─▶ RRF re-rank ─▶ prune ─▶ context for the LLM
+              question's entities ────────────┘
 ```
+
+The graph doesn't just *expand* the result — it **re-ranks** it. We over-fetch
+vector candidates, score each by how close its entities sit to the entities in
+the *question*, fuse the two rankings, and keep only the relevant facts. More
+on that below.
 
 ## Building it
 
@@ -124,55 +129,94 @@ cur.execute(
 )
 ```
 
-### 3. Retrieval — fuse vector and graph
+### 3. Retrieval — let the graph re-rank the vectors
 
-The query path runs both retrievers and combines them. **A. Vector** — nearest
-chunks by cosine distance:
+The naïve version of Graph RAG retrieves the top-*k* chunks, then dumps every
+one-hop neighbour of every entity it finds into the prompt. That has two
+problems: the graph never influences *which* chunks win (vector order is final),
+and the context balloons with facts that have nothing to do with the question.
+The community fix — used by Neo4j hybrid retrieval, Microsoft GraphRAG's "local
+search", FalkorDB — is **over-fetch, re-rank with the graph signal, then prune
+to the query-relevant subgraph**. Here's that pipeline.
+
+**A. Over-fetch vector candidates** — a wide net, not the final answer:
 
 ```python
 cur.execute(
     "SELECT chunk_id, doc_id, content, 1 - (embedding <=> %s) AS cosine_sim "
     "FROM doc_chunks ORDER BY embedding <=> %s LIMIT %s;",
-    (q, q, k),
+    (q, q, CANDIDATE_K),          # CANDIDATE_K=10, far more than we'll keep
 )
 ```
 
-**B. Graph** — from the entities in those top chunks, traverse one hop in MAGE
-to pull in connected facts that vector search alone would miss:
+**B. Anchor the *question* in the graph.** We extract the entities from the
+question itself, resolve them to graph nodes (case-insensitive), and score each
+candidate chunk by how close *its* entities sit to those anchors — direct hits
+plus one-hop adjacency, decayed:
 
 ```python
-cur.execute(
-    f"SELECT * FROM cypher('knowledge_graph', $q$ "
-    f'MATCH (a:Entity {{name: "{ent}"}})-[r:RELATED_TO]-(b:Entity) '
-    "RETURN r.predicate, b.name $q$) AS (rel agtype, nbr agtype);"
-)
+def _graph_proximity(chunk_entities, anchors, anchor_nbrs):
+    direct   = len(chunk_entities & anchors)
+    adjacent = len(chunk_entities & anchor_nbrs - anchors)
+    return ANCHOR_WEIGHT * direct + HOP_WEIGHT * adjacent
 ```
 
-The fused result — chunks *plus* graph facts — is what you hand to the model.
+This is the signal vector search structurally can't see: a chunk whose text
+isn't lexically similar to the question can still be *graph-close* to what the
+question is about.
+
+**C. Fuse with Reciprocal Rank Fusion (RRF).** Each chunk has a vector rank and
+a graph rank; RRF blends them without tuning weights or normalizing scores:
+
+```python
+def _rrf(*ranks):                 # ranks = (vector_rank, graph_rank)
+    return sum(1.0 / (RRF_K + r) for r in ranks if r is not None)
+```
+
+A graph-relevant chunk can now be **promoted past a higher vector hit**, and a
+lexically-similar-but-irrelevant chunk demoted.
+
+**D. Prune the facts to a budget.** Instead of the whole neighbourhood, we keep
+only edges touching the anchors or the winning chunks — scoring edges that
+*bridge* an anchor to a retrieved chunk highest — and cap the total:
+
+```python
+if (a and cb) or (b and ca):      # anchor on one end, winning chunk on the other
+    score += 1.0                  # bridge bonus
+...
+kept = [fact for fact, _ in ordered[:MAX_FACTS]]   # MAX_FACTS=18, no silent dump
+```
+
+The fused result — the re-ranked chunks *plus* a tight, query-relevant set of
+graph facts — is what you hand to the model.
 
 ## It actually runs
 
 ```
-$ python src/query.py "how does yugabytedb do graph rag?"
+$ python src/query.py "What is MAGE and how is Apache AGE related to YugabyteDB?"
 
---- Vector hits (pgvector) ---
-[0.547] yugabytedb.md: YugabyteDB is a distributed SQL database built by Yugabyte...
-[0.497] graphrag.md:   Graph RAG combines vector search with a knowledge graph...
+--- Query anchors (entities found in the graph) ---
+  MAGE, Apache AGE, PostgreSQL, YugabyteDB
 
---- Graph expansion (MAGE one-hop) ---
-  2026.1 Release Line -[ADDS]-> MAGE
-  Apache AGE -[COMPATIBLE_WITH]-> MAGE
-  Pgvector Extension -[SUPPORTS]-> YugabyteDB
-  Knowledge Graph -[FUSES]-> Hybrid Graph RAG
-  YSQL API -[RUNS_ON_PORT]-> 5433
+--- Fused ranking (RRF of vector + graph proximity, 2 candidates) ---
+[rrf 0.0333]  vec#0 (sim 0.750)  graph#0 (score 3.5)  yugabytedb.md#101: YugabyteDB is a distributed SQL database...
+[rrf 0.0328]  vec#1 (sim 0.140)  graph#1 (score 3.0)  graphrag.md#102: Graph RAG combines vector search with a...
+
+--- Pruned graph facts (kept 18 of 30) ---
+  MAGE -[RELATED_TO]-> Apache AGE
+  MAGE -[RELATED_TO]-> YugabyteDB
+  Apache AGE -[RELATED_TO]-> MAGE
+  YugabyteDB -[RELATED_TO]-> MAGE
   ...
 ```
 
-Notice what the graph adds. The vector hits surface the two most relevant
-paragraphs. The graph then contributes *structured* facts — `Apache AGE
-COMPATIBLE_WITH MAGE`, `2026.1 Release Line ADDS MAGE`, `Pgvector Extension
-SUPPORTS YugabyteDB` — relationships the LLM can reason over directly, several
-of which never appeared in the top chunks.
+Notice what changed versus naïve Graph RAG. Each candidate carries *both* a
+vector rank and a graph rank, and the **fused** RRF score decides the order —
+the second chunk's cosine similarity is only 0.14, but its graph proximity to
+the question's entities (score 3.0) keeps it in the running. And the fact list
+is **pruned to 18 of 30 candidate edges**, with the ones that actually bridge
+the question's anchors — `MAGE → Apache AGE`, `MAGE → YugabyteDB` — surfaced
+first, instead of the whole neighbourhood spilling into the prompt.
 
 ## Why this matters
 
@@ -182,8 +226,10 @@ memory search fuses both. The pattern generalizes to any RAG system:
 
 - **Operational simplicity.** One database. Vector and graph scale, replicate,
   and fail over together. No sync pipeline, no second security boundary.
-- **Richer recall.** Multi-hop relationships and indirect connections that pure
-  vector similarity structurally cannot retrieve.
+- **Richer recall, better ranking.** Multi-hop relationships and indirect
+  connections that pure vector similarity structurally cannot retrieve — and the
+  graph signal *re-ranks* the vector hits (via RRF) rather than just padding
+  them, so the relevant chunk wins even when it isn't the closest by cosine.
 - **It's just SQL + cypher.** No bespoke graph database to learn to operate —
   it's PostgreSQL-compatible YSQL with two extensions.
 

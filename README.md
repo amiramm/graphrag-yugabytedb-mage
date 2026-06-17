@@ -34,10 +34,18 @@ ingest ───▶ │  doc_chunks(content, embedding vector(1024))   ◀──
             │        ▼                                                                  │
             │  kg graph:  (:Entity {name, last_chunk})-[:REL]->(:Entity)  ◀── MAGE      │
             └───────────────────────────────────────────────────────────────────────────┘
-query ───▶  A) vector top-k  ─┐
-                              ├─▶  fuse  ─▶  context for the LLM
-            B) graph 1-hop  ──┘
+query ───▶  A) vector over-fetch (candidates) ─┐
+            B) graph proximity to the          ├─▶ RRF re-rank ─▶ prune facts ─▶ context for the LLM
+               question's entities ────────────┘
 ```
+
+The graph doesn't just expand — it **re-ranks** the vector candidates. We
+over-fetch chunks, score each by how close its entities sit to the entities in
+the *question*, fuse the two rankings with Reciprocal Rank Fusion (RRF), and
+keep only the query-relevant graph facts (capped to a budget) — instead of
+stuffing the whole one-hop neighbourhood into the context. This mirrors how
+community Graph RAG systems work (Neo4j hybrid retrieval, Microsoft GraphRAG
+"local search", FalkorDB).
 
 ## Prerequisites
 
@@ -64,7 +72,7 @@ pip install -r requirements.txt
 # 3. Ingest the sample corpus (or pass your own .md/.txt files)
 python src/ingest.py
 
-# 4. Ask a question — see vector hits, graph expansion, and the fused context
+# 4. Ask a question — see vector hits, graph expansion, fused context, and an LLM answer
 python src/query.py "how does yugabytedb do graph rag?"
 ```
 
@@ -76,9 +84,14 @@ python src/query.py "how does yugabytedb do graph rag?"
 - **`src/ingest.py`** — chunks each doc, embeds + inserts it, extracts triples,
   and `MERGE`s entities/relationships into the graph (tagging nodes with the
   source `chunk_id`).
-- **`src/query.py`** — embeds the question, runs pgvector top-k, collects the
-  entities in those chunks, traverses one hop in MAGE, and prints the fused
-  context an LLM would consume.
+- **`src/query.py`** — the hybrid retriever. Over-fetches pgvector candidates,
+  extracts the question's entities and anchors them in the graph, scores each
+  candidate by graph proximity to those anchors, fuses the vector and graph
+  rankings with **RRF**, prunes the graph facts to the query-relevant subgraph
+  (budget-capped), prints a ranked/scored trace, and sends the fused context to
+  Bedrock Claude for a grounded answer (`--no-llm` skips the LLM). The
+  `retrieve(question) -> RankedContext` function is importable for use in your
+  own generation pipeline.
 
 ### MAGE specifics on YugabyteDB 2026.1
 
