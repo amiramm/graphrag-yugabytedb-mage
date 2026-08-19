@@ -4,12 +4,14 @@
 The best retrieval does both — and with YugabyteDB 2026.1 you can do both in
 one distributed SQL database, no second system to operate.*
 
-> **Draft / not yet for publication.** The accompanying demo is validated on
-> released YugabyteDB `2026.1.1.1-b2`, but the GA MAGE engine requires
-> per-tenant properties named `meko_datapack_id` / `meko_user_id` /
-> `meko_agent_id` on every node and edge — they cannot be removed, and the
-> `meko_*` naming needs a decision before this ships as public YugabyteDB
-> material.
+> **MAGE is a Tech Preview feature.** You enable it with a flag, and its
+> behavior can change in later releases. During Tech Preview, the graph engine
+> is tailored to the use case it was built for first — Meko, a memory layer for
+> AI agents — so it requires three tenant properties on every node and edge. The
+> demo sets them for you. As MAGE matures to Early Access and then GA,
+> YugabyteDB plans to generalize the engine so these properties are no longer
+> required. The [demo README](https://github.com/amiramm/graphrag-yugabytedb-mage#tenant-properties)
+> explains what to expect if you write your own Cypher today.
 
 ---
 
@@ -51,7 +53,7 @@ chunks and your knowledge graph share one connection, one transaction domain,
 one security model, one thing to scale. You cross-reference them with ordinary
 SQL.
 
-```
+```text
             ┌──────────────────── YugabyteDB 2026.1 (YSQL) ─────────────────────┐
  ingest ──▶ │  doc_chunks(content, embedding vector(1024))  ◀── pgvector ybhnsw  │
             │       │ chunk_id                                                    │
@@ -71,8 +73,8 @@ on that below.
 
 ## Building it
 
-Everything below is from a working demo:
-**https://github.com/amiramm/graphrag-yugabytedb-mage**. The code runs against
+Everything below is from a
+[working demo](https://github.com/amiramm/graphrag-yugabytedb-mage). The code runs against
 YugabyteDB 2026.1 and uses Amazon Bedrock (Titan V2 embeddings + Claude) for
 embeddings and entity extraction — with a zero-dependency offline fallback so
 the pipeline runs without any cloud account.
@@ -118,7 +120,9 @@ chunk_id = cur.fetchone()[0]
 
 Second, extract entity/relationship triples (an LLM call, or a heuristic
 offline) and MERGE them into the graph — tagging each node with the
-`chunk_id` it came from, so the two stores point at each other:
+`chunk_id` it came from, so the two stores point at each other. The `tenant`
+fragment adds the three tenant properties that MAGE requires during Tech
+Preview; one helper builds it, so there is one place to change later:
 
 ```python
 # one combined MERGE: both endpoints + the edge
@@ -194,7 +198,7 @@ graph facts — is what you hand to the model.
 
 ## It actually runs
 
-```
+```output
 $ python src/query.py "What is MAGE and how is Apache AGE related to YugabyteDB?"
 
 --- Query anchors (entities found in the graph) ---
@@ -246,9 +250,9 @@ python src/ingest.py
 python src/query.py "how does yugabytedb do graph rag?"
 ```
 
-The README documents the MAGE specifics worth knowing on 2026.1 (the
-`mag_catalog` schema, the per-tenant property contract, and the single-label
-edge pattern), and the demo runs with or without an AWS/Bedrock account.
+The README covers what to know about MAGE in Tech Preview: the `mag_catalog`
+schema, the tenant properties every node and edge carries for now, and the
+single-label edge pattern. The demo runs with or without an AWS account.
 
 *Vector search and graph traversal aren't competing approaches to RAG — they're
 complementary, and YugabyteDB 2026.1 finally lets you run both without running

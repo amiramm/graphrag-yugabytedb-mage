@@ -1,8 +1,8 @@
 # YugabyteDB with vector + MAGE graph extensions, built from a release tarball.
 #
-# OPTIONAL — docker-compose.yml uses the official multi-arch
-# `yugabytedb/yugabyte` image (2026.1.1 GA publishes native arm64), so this is
-# only needed for pre-release / dev builds that aren't on Docker Hub. See
+# OPTIONAL — docker-compose.yml pulls the official multi-arch
+# `yugabytedb/yugabyte` image, which covers both arm64 and amd64 from 2026.1.1
+# on. Use this file only for a version that isn't on Docker Hub yet. See
 # db/README.md.
 #
 # Use a native-arch tarball: on Apple Silicon an amd64 build under QEMU

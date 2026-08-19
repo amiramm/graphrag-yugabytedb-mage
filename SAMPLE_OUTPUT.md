@@ -1,13 +1,14 @@
-# Sample run — Hybrid Graph RAG on YugabyteDB 2026.1.1
-# (released `yugabytedb/yugabyte:2026.1.1.1-b2`; Amazon Bedrock: Titan Text
-#  Embeddings V2 + Claude Sonnet 4.6)
+# Sample run — hybrid Graph RAG on YugabyteDB 2026.1.1
+
+Recorded on `yugabytedb/yugabyte:2026.1.1.1-b2`, using Amazon Bedrock for
+embeddings (Titan Text Embeddings V2) and generation (Claude Sonnet 4.6).
 
 The query step over-fetches vector candidates, re-ranks them with a
 query-anchored graph-proximity signal via Reciprocal Rank Fusion (RRF), and
 prunes the graph facts to the query-relevant subgraph (capped to a budget)
 instead of dumping the entire one-hop neighbourhood.
 
-```
+```output
 $ python src/ingest.py
 Ingested 2 chunks, 29 node-merges, 28 edge-merges.
 
@@ -86,6 +87,7 @@ So Apache AGE is related to YugabyteDB only through MAGE as an intermediary — 
 ```
 
 > Notes
+>
 > - Re-ranking only changes the *order* when the graph signal disagrees with
 >   vector similarity; with this two-chunk corpus the vector top hit is also the
 >   graph top hit, so the value shows up most clearly in the **pruned fact set**

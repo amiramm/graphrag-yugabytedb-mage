@@ -1,14 +1,14 @@
-# Hybrid Graph RAG on YugabyteDB 2026.1.1 (GA) with vector + MAGE.
+# Hybrid Graph RAG on YugabyteDB 2026.1.1 with vector + MAGE.
 #
-# `db` runs a single-node YugabyteDB from the **official** multi-arch image —
-# the 2026.1.1 line publishes native `arm64` as well as `amd64`, so there is
-# nothing to build and no release tarball to fetch. `db-init` applies the
-# schema once the database is healthy. The Python demo (src/) talks to YSQL on
-# localhost:5433.
+# `db` runs a single-node YugabyteDB from the official multi-arch image, which
+# covers both arm64 and amd64, so there is nothing to build. The two
+# ysql_yb_enable_mage flags turn on MAGE, a Tech Preview feature. `db-init`
+# applies the schema once the database is healthy. The Python demo (src/) talks
+# to YSQL on localhost:5433.
 #
-# Override the version with YB_IMAGE, e.g.
+# To run a different version, set YB_IMAGE, for example:
 #   YB_IMAGE=yugabytedb/yugabyte:2026.1.1.0-b91 docker compose up -d
-# To run a pre-release/dev tarball instead, see db/README.md.
+# To build an image yourself, see db/README.md.
 services:
   db:
     image: ${YB_IMAGE:-yugabytedb/yugabyte:2026.1.1.1-b2}

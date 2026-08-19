@@ -27,12 +27,17 @@ BEDROCK_LLM_MODEL = os.environ.get(
     "BEDROCK_LLM_MODEL", "us.anthropic.claude-sonnet-4-6"
 )
 
-# YugabyteDB's MAGE engine enforces multi-tenancy: every graph vertex and edge
-# MUST carry these three string properties or cypher CREATE/MERGE raises
-# "missing required tenant property". Confirmed on released 2026.1.1.1-b2 (not
-# just pre-GA builds), and `mage.enable_containment = off` does not lift it.
-# There is no session GUC to supply them — they are inlined into each cypher
-# clause. For a single-tenant demo we use fixed values; a real multi-tenant app
+# MAGE handles multi-tenancy inside the engine: every vertex and edge must carry
+# these three properties, or cypher CREATE/MERGE fails with "missing required
+# tenant property". The engine type-checks two of them: meko_datapack_id and
+# meko_user_id must be UUIDs, while meko_agent_id can be any string. No setting
+# turns this off (including mage.enable_containment), and there is no session
+# variable that supplies the values, so each cypher clause spells them out.
+#
+# The property names come from Meko, the use case MAGE is tailored to while the
+# feature is in Tech Preview; expect tenancy to be generalized as MAGE moves to
+# Early Access and GA. Keeping them in this one helper means one place to
+# change. A single-tenant demo can use fixed values; a multi-tenant application
 # varies them per request.
 TENANT_DATAPACK_ID = os.environ.get("MEKO_DATAPACK_ID", "00000000-0000-0000-0000-000000000001")
 TENANT_USER_ID = os.environ.get("MEKO_USER_ID", "00000000-0000-0000-0000-000000000002")
