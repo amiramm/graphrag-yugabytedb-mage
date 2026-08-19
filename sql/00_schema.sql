@@ -1,4 +1,4 @@
--- Hybrid Graph RAG schema on YugabyteDB 2026.1.
+-- Hybrid Graph RAG schema on YugabyteDB 2026.1.1 (verified on 2026.1.1.1-b2).
 --
 -- Two complementary stores over the SAME distributed SQL database:
 --   1. pgvector  -> semantic similarity over document chunks

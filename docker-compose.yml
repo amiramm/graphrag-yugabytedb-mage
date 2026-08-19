@@ -1,20 +1,20 @@
-# Hybrid Graph RAG on YugabyteDB (master / 2026.1 line) with vector + MAGE.
+# Hybrid Graph RAG on YugabyteDB 2026.1.1 (GA) with vector + MAGE.
 #
-# `db` runs a single-node YugabyteDB built from a native aarch64 master
-# tarball (see db/Dockerfile). `db-init` applies the schema once the database
-# is healthy. The Python demo (src/) talks to YSQL on localhost:5433.
+# `db` runs a single-node YugabyteDB from the **official** multi-arch image —
+# the 2026.1.1 line publishes native `arm64` as well as `amd64`, so there is
+# nothing to build and no release tarball to fetch. `db-init` applies the
+# schema once the database is healthy. The Python demo (src/) talks to YSQL on
+# localhost:5433.
+#
+# Override the version with YB_IMAGE, e.g.
+#   YB_IMAGE=yugabytedb/yugabyte:2026.1.1.0-b91 docker compose up -d
+# To run a pre-release/dev tarball instead, see db/README.md.
 services:
   db:
-    build:
-      context: ./db
-      args:
-        # Native aarch64 packaged release tarball (place it in ./db first —
-        # see db/README.md). Override to pin a different build.
-        YB_TARBALL: yugabyte-2026.1.0.0-b109-almalinux8-aarch64.tar.gz
-    image: yb-graphrag:2026.1.0.0-b109
+    image: ${YB_IMAGE:-yugabytedb/yugabyte:2026.1.1.1-b2}
     hostname: db
     command:
-      - yugabyted
+      - bin/yugabyted
       - start
       - --daemon=false
       - --tserver_flags=ysql_yb_enable_mage=true
@@ -31,7 +31,7 @@ services:
       start_period: 30s
 
   db-init:
-    image: yb-graphrag:2026.1.0.0-b109
+    image: ${YB_IMAGE:-yugabytedb/yugabyte:2026.1.1.1-b2}
     depends_on:
       db:
         condition: service_healthy

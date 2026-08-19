@@ -1,12 +1,18 @@
-# Hybrid Graph RAG on YugabyteDB (2026.1) with pgvector + MAGE
+# Hybrid Graph RAG on YugabyteDB (2026.1.1) with pgvector + MAGE
 
-> ⚠️ **Status: demo-only, not yet publishable.** This runs against the
-> **Meko-customized** MAGE build of YugabyteDB 2026.1, whose graph engine
-> *requires* per-tenant properties (`meko_datapack_id`, `meko_user_id`,
-> `meko_agent_id`) on every vertex and edge — these are **not** part of
-> stock/GA MAGE. The demo is suitable for showing at DSS; before publishing as
-> a general blog, re-verify the Cypher against a non-Meko MAGE build (the
-> tenant props should then be unnecessary). See "Tenant properties" below.
+> ✅ **Validated end-to-end on released YugabyteDB `2026.1.1.1-b2`** (official
+> multi-arch image, `PostgreSQL 15.12-YB-2026.1.1.1-b0`, `mage` 1.6.0,
+> `vector` 0.8.0-yb-1.0) — schema, ingest, and hybrid retrieval all run
+> unmodified in both offline and Amazon Bedrock modes.
+>
+> ⚠️ **One caveat before publishing this as a general blog:** the GA graph
+> engine *requires* per-tenant properties named `meko_datapack_id`,
+> `meko_user_id`, and `meko_agent_id` on every vertex and edge. This was
+> originally assumed to be Meko-fork-only, but it ships in GA — a stock
+> release rejects `MERGE (n:Entity {name:"x"})` with
+> `missing required tenant property "meko_datapack_id"`. The Cypher here is
+> therefore correct as written, but the `meko_*` naming is awkward to explain
+> in public YugabyteDB material. See "Tenant properties" below.
 
 A small, **runnable** demo of *hybrid Graph RAG* on a single distributed SQL
 database. It combines two retrievers over the same YugabyteDB instance:
@@ -23,7 +29,7 @@ language model a richer, more connected context than vector search alone.
 
 > Why one database? Vector search and the knowledge graph live in the **same**
 > YugabyteDB cluster — no separate graph database, no second system to operate,
-> sync, or secure. YugabyteDB 2026.1 ships both `pgvector` and `MAGE`.
+> sync, or secure. YugabyteDB 2026.1.1 ships both `pgvector` and `MAGE`.
 
 ## Architecture
 
@@ -49,7 +55,9 @@ community Graph RAG systems work (Neo4j hybrid retrieval, Microsoft GraphRAG
 
 ## Prerequisites
 
-- Docker (tested with Colima on Apple Silicon — **native arm64**, see note below)
+- Docker (tested with Colima on Apple Silicon — **native arm64**, see note
+  below). Nothing to build: compose pulls the official
+  `yugabytedb/yugabyte:2026.1.1.1-b2` multi-arch image.
 - Python 3.11+
 - *Optional:* AWS credentials with Amazon Bedrock access (in a region where
   `amazon.titan-embed-text-v2:0` and a Claude model are enabled, e.g.
@@ -63,7 +71,8 @@ community Graph RAG systems work (Neo4j hybrid retrieval, Microsoft GraphRAG
 
 ```bash
 # 1. Start YugabyteDB (vector + MAGE) and apply the schema
-docker compose up -d --build        # or: docker-compose up -d --build
+docker compose up -d               # pulls the official 2026.1.1 image
+# pin a different build:  YB_IMAGE=yugabytedb/yugabyte:2026.1.1.0-b91 docker compose up -d
 
 # 2. Install the Python deps
 python -m venv .venv && . .venv/bin/activate
@@ -93,7 +102,7 @@ python src/query.py "how does yugabytedb do graph rag?"
   `retrieve(question) -> RankedContext` function is importable for use in your
   own generation pipeline.
 
-### MAGE specifics on YugabyteDB 2026.1
+### MAGE specifics on YugabyteDB 2026.1.1
 
 This is worth knowing if you adapt the cypher:
 
@@ -102,29 +111,37 @@ This is worth knowing if you adapt the cypher:
   `mag_catalog` on the `search_path` — schema-qualifying them, or wrapping in
   an explicit `BEGIN/COMMIT`, raises *"Commit separate ddl txn called when not
   in a separate DDL transaction"*.
-- **Tenant properties (Meko build only).** This build enforces multi-tenancy
-  in the engine: every vertex *and* edge must carry `meko_datapack_id`,
-  `meko_user_id`, `meko_agent_id` (see `tenant_props()` in `src/common.py`).
-  These names are hard-coded in the compiled `mage.so` — there is no gflag to
-  disable the requirement. They are **specific to the Meko fork**; a stock/GA
-  MAGE build is not expected to require them, so on a non-Meko build you can
-  drop `tenant_props()` from the cypher entirely.
+- **Tenant properties are required — including on GA.** MAGE enforces
+  multi-tenancy in the engine: every vertex *and* edge must carry
+  `meko_datapack_id`, `meko_user_id`, `meko_agent_id` (see `tenant_props()` in
+  `src/common.py`), or the statement fails with
+  `missing required tenant property "meko_datapack_id"`. Verified against
+  released `2026.1.1.1-b2`, so this is **not** a Meko-fork behaviour and
+  `tenant_props()` cannot be dropped. The names are hard-coded in the compiled
+  `mage.so`; there is no gflag or GUC to turn the requirement off — notably
+  `SET mage.enable_containment = off` (a MAGE GUC, on by default) does **not**
+  lift it. For a single-tenant demo, fixed values are fine.
 - Only edge labels declared via `create_elabel` resolve, so all edges use the
   single `RELATED_TO` label and keep the real predicate as a property.
 
 ## A note on Apple Silicon
 
-YugabyteDB 2026.1 must run **natively**. The published `amd64` image crashes
-under QEMU x86-64 emulation — the `yb-master` shared-memory allocator fails with
-`mmap: Cannot allocate memory (system error 12)` regardless of how much RAM the
-VM has. This demo therefore builds from a native `aarch64` AlmaLinux 8 release
-tarball (`db/Dockerfile`), which runs at full speed.
+YugabyteDB must run **natively**. Under QEMU x86-64 emulation the `yb-master`
+shared-memory allocator fails with `mmap: Cannot allocate memory (system error
+12)` regardless of how much RAM the VM has — so an emulated `amd64` image is not
+a workable fallback.
+
+Good news on 2026.1.1: the official `yugabytedb/yugabyte` tags are **multi-arch**
+and include native `arm64`, so Docker resolves the right architecture and there
+is nothing to build. (This demo originally built a native `aarch64` image from a
+release tarball because the pre-GA build published only `amd64`;
+`db/Dockerfile` is retained for that case — see `db/README.md`.)
 
 ## Layout
 
 ```
-db/Dockerfile          native-arch YugabyteDB image (vector + MAGE)
-docker-compose.yml     db + one-shot schema init
+docker-compose.yml     db (official 2026.1.1 image) + one-shot schema init
+db/Dockerfile          optional: build from a release tarball (pre-GA builds)
 sql/00_schema.sql      extensions, vector table + index, graph
 src/common.py          DB connection, embeddings, entity extraction
 src/ingest.py          chunk → embed → insert → extract → graph MERGE
