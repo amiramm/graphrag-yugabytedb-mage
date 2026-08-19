@@ -1,5 +1,6 @@
-# Sample run — Hybrid Graph RAG on YugabyteDB 2026.1
-# (Amazon Bedrock: Titan Text Embeddings V2 + Claude Sonnet 4.6)
+# Sample run — Hybrid Graph RAG on YugabyteDB 2026.1.1
+# (released `yugabytedb/yugabyte:2026.1.1.1-b2`; Amazon Bedrock: Titan Text
+#  Embeddings V2 + Claude Sonnet 4.6)
 
 The query step over-fetches vector candidates, re-ranks them with a
 query-anchored graph-proximity signal via Reciprocal Rank Fusion (RRF), and
@@ -8,89 +9,93 @@ instead of dumping the entire one-hop neighbourhood.
 
 ```
 $ python src/ingest.py
-Ingested 2 chunks, 15 node-merges, 17 edge-merges.
+Ingested 2 chunks, 29 node-merges, 28 edge-merges.
 
 $ python src/query.py "What is MAGE and how is Apache AGE related to YugabyteDB?"
 
 === Question: What is MAGE and how is Apache AGE related to YugabyteDB?
 
 --- Query anchors (entities found in the graph) ---
-  MAGE, Apache AGE, PostgreSQL, YugabyteDB
+  MAGE, Apache AGE, YugabyteDB
 
 --- Fused ranking (RRF of vector + graph proximity, 2 candidates) ---
-[rrf 0.0333]  vec#0 (sim 0.750)  graph#0 (score 3.5)  yugabytedb.md#101: YugabyteDB is a distributed SQL database built by Yugabyte. It is Post...
-[rrf 0.0328]  vec#1 (sim 0.140)  graph#1 (score 3.0)  graphrag.md#102: Graph RAG combines vector search with a knowledge graph. Vector search...
+[rrf 0.0333]  vec#0 (sim 0.750)  graph#0 (score 5.0)  yugabytedb.md#1: YugabyteDB is a distributed SQL database built by Yugabyte. It is Post...
+[rrf 0.0328]  vec#1 (sim 0.140)  graph#1 (score 3.0)  graphrag.md#2: Graph RAG combines vector search with a knowledge graph. Vector search...
 
---- Pruned graph facts (kept 18 of 30) ---
-  MAGE -[RELATED_TO]-> Apache AGE
-  MAGE -[RELATED_TO]-> YugabyteDB
-  Apache AGE -[RELATED_TO]-> MAGE
-  YugabyteDB -[RELATED_TO]-> MAGE
-  MAGE -[RELATED_TO]-> The
-  PostgreSQL -[RELATED_TO]-> Yugabyte
-  PostgreSQL -[RELATED_TO]-> YSQL API
-  YugabyteDB -[RELATED_TO]-> SQL
-  YugabyteDB -[RELATED_TO]-> Graph RAG
-  YugabyteDB -[RELATED_TO]-> The
-  YugabyteDB -[RELATED_TO]-> YSQL API
-  Graph RAG -[RELATED_TO]-> YugabyteDB
-  The -[RELATED_TO]-> MAGE
-  The -[RELATED_TO]-> YugabyteDB
-  YSQL API -[RELATED_TO]-> PostgreSQL
-  YSQL API -[RELATED_TO]-> YugabyteDB
-  Yugabyte -[RELATED_TO]-> PostgreSQL
-  SQL -[RELATED_TO]-> YugabyteDB
+--- Pruned graph facts (kept 18 of 56) ---
+  MAGE -[COMPATIBLE_WITH]-> Apache AGE
+  Apache AGE -[COMPATIBLE_WITH]-> MAGE
+  MAGE -[LETS_STORE]-> Property Graph
+  MAGE -[USES]-> Meko
+  MAGE -[IS_A]-> Graph Engine
+  MAGE -[ADDS]-> 2026.1 Release Line
+  YugabyteDB -[IS_A]-> Distributed SQL Database
+  YugabyteDB -[RUNS]-> YSQL API
+  YugabyteDB -[COMPATIBLE_WITH]-> PostgreSQL
+  YugabyteDB -[BUILT_BY]-> Yugabyte
+  YugabyteDB -[DEPLOYED_OVER]-> Graph RAG
+  YugabyteDB -[USES]-> Meko
+  YugabyteDB -[SUPPORTS]-> Pgvector Extension
+  PostgreSQL -[COMPATIBLE_WITH]-> YugabyteDB
+  2026.1 Release Line -[ADDS]-> MAGE
+  Graph Engine -[IS_A]-> MAGE
+  Pgvector Extension -[SUPPORTS]-> YugabyteDB
+  Property Graph -[LETS_STORE]-> MAGE
 
 --- Fused context for the LLM ---
 Chunks:
 - YugabyteDB is a distributed SQL database built by Yugabyte. It is PostgreSQL compatible and runs the YSQL API on port 5433. YugabyteDB supports the pgvector extension for similarity search. The 2026.1 release line adds MAGE, a graph engine compatible with Apache AGE. MAGE lets YugabyteDB store entities and relationships as a property graph.
 - Graph RAG combines vector search with a knowledge graph. Vector search retrieves chunks semantically similar to a query. The knowledge graph adds multi-hop traversal over entities and relationships. Hybrid Graph RAG fuses both signals to give a language model richer context. Meko uses Graph RAG over YugabyteDB with pgvector and MAGE.
 Graph facts:
-- MAGE -[RELATED_TO]-> Apache AGE
-- MAGE -[RELATED_TO]-> YugabyteDB
-- Apache AGE -[RELATED_TO]-> MAGE
-- YugabyteDB -[RELATED_TO]-> MAGE
-- MAGE -[RELATED_TO]-> The
-- PostgreSQL -[RELATED_TO]-> Yugabyte
-- PostgreSQL -[RELATED_TO]-> YSQL API
-- YugabyteDB -[RELATED_TO]-> SQL
-- YugabyteDB -[RELATED_TO]-> Graph RAG
-- YugabyteDB -[RELATED_TO]-> The
-- YugabyteDB -[RELATED_TO]-> YSQL API
-- Graph RAG -[RELATED_TO]-> YugabyteDB
-- The -[RELATED_TO]-> MAGE
-- The -[RELATED_TO]-> YugabyteDB
-- YSQL API -[RELATED_TO]-> PostgreSQL
-- YSQL API -[RELATED_TO]-> YugabyteDB
-- Yugabyte -[RELATED_TO]-> PostgreSQL
-- SQL -[RELATED_TO]-> YugabyteDB
+- MAGE -[COMPATIBLE_WITH]-> Apache AGE
+- Apache AGE -[COMPATIBLE_WITH]-> MAGE
+- MAGE -[LETS_STORE]-> Property Graph
+- MAGE -[USES]-> Meko
+- MAGE -[IS_A]-> Graph Engine
+- MAGE -[ADDS]-> 2026.1 Release Line
+- YugabyteDB -[IS_A]-> Distributed SQL Database
+- YugabyteDB -[RUNS]-> YSQL API
+- YugabyteDB -[COMPATIBLE_WITH]-> PostgreSQL
+- YugabyteDB -[BUILT_BY]-> Yugabyte
+- YugabyteDB -[DEPLOYED_OVER]-> Graph RAG
+- YugabyteDB -[USES]-> Meko
+- YugabyteDB -[SUPPORTS]-> Pgvector Extension
+- PostgreSQL -[COMPATIBLE_WITH]-> YugabyteDB
+- 2026.1 Release Line -[ADDS]-> MAGE
+- Graph Engine -[IS_A]-> MAGE
+- Pgvector Extension -[SUPPORTS]-> YugabyteDB
+- Property Graph -[LETS_STORE]-> MAGE
 
 --- LLM answer ---
-## MAGE and Its Relationship to YugabyteDB via Apache AGE
+## Answer
 
 ### What is MAGE?
-**MAGE** is a **graph engine** introduced in the YugabyteDB **2026.1 release line**. It is compatible with **Apache AGE** and enables YugabyteDB to **store entities and relationships as a property graph**.
 
-### How is Apache AGE Related to YugabyteDB?
-The relationship is **indirect, through MAGE**:
+Based on the context, **MAGE** is a **graph engine** added in the **2026.1 release line** of YugabyteDB. It is compatible with **Apache AGE** and allows YugabyteDB to **store entities and relationships as a property graph**.
 
-1. **MAGE is compatible with Apache AGE** — it was built to align with the Apache AGE graph engine standard.
-2. **MAGE is part of YugabyteDB** — it was added to YugabyteDB in the 2026.1 release line.
+---
 
-This means **Apache AGE is related to YugabyteDB through MAGE** as the connecting technology.
+### How is Apache AGE related to YugabyteDB?
 
-> This is also reflected in the graph facts: `Apache AGE -[RELATED_TO]-> MAGE` and `MAGE -[RELATED_TO]-> YugabyteDB`.
+The context does **not describe a direct relationship** between Apache AGE and YugabyteDB. The connection is **indirect**:
+
+- YugabyteDB (via its 2026.1 release) **includes MAGE**
+- MAGE is **compatible with Apache AGE**
+
+So Apache AGE is related to YugabyteDB only through MAGE as an intermediary — there is no direct relationship stated between Apache AGE and YugabyteDB in the provided context.
 ```
 
 > Notes
 > - Re-ranking only changes the *order* when the graph signal disagrees with
 >   vector similarity; with this two-chunk corpus the vector top hit is also the
 >   graph top hit, so the value shows up most clearly in the **pruned fact set**
->   (18 of 30 kept, anchor-relevant facts surfaced first) rather than a chunk
+>   (18 of 56 kept, anchor-relevant facts surfaced first) rather than a chunk
 >   reshuffle. On larger corpora the fusion routinely promotes a
 >   lower-vector-ranked chunk that is closer to the query entities.
 > - Offline (no AWS creds) the heuristic entity extractor only finds capitalized
 >   phrases, so a lowercase question may resolve **no anchors** and the pipeline
->   degrades gracefully to pure vector order — by design.
-> - Cloud-mode anchor lists vary slightly run-to-run because question-entity
->   extraction uses Claude (non-deterministic).
+>   degrades gracefully to pure vector order — by design. Offline the same
+>   corpus yields fewer, coarser triples (15 node-merges / 17 edge-merges vs.
+>   29 / 28 in cloud mode).
+> - Cloud-mode anchor lists, predicate names, and total fact counts vary
+>   run-to-run because triple extraction uses Claude (non-deterministic).

@@ -4,10 +4,12 @@
 The best retrieval does both — and with YugabyteDB 2026.1 you can do both in
 one distributed SQL database, no second system to operate.*
 
-> **Draft / not yet for publication.** The accompanying demo currently runs on a
-> Meko-customized MAGE build that requires per-tenant properties on every node
-> and edge. Those `meko_*` properties are Meko-specific and would be removed
-> before this is published against a stock/GA MAGE build of YugabyteDB 2026.1.
+> **Draft / not yet for publication.** The accompanying demo is validated on
+> released YugabyteDB `2026.1.1.1-b2`, but the GA MAGE engine requires
+> per-tenant properties named `meko_datapack_id` / `meko_user_id` /
+> `meko_agent_id` on every node and edge — they cannot be removed, and the
+> `meko_*` naming needs a decision before this ships as public YugabyteDB
+> material.
 
 ---
 
@@ -238,7 +240,7 @@ memory search fuses both. The pattern generalizes to any RAG system:
 ```bash
 git clone https://github.com/amiramm/graphrag-yugabytedb-mage
 cd graphrag-yugabytedb-mage
-docker compose up -d --build      # YugabyteDB 2026.1 + schema
+docker compose up -d              # YugabyteDB 2026.1.1 + schema
 pip install -r requirements.txt
 python src/ingest.py
 python src/query.py "how does yugabytedb do graph rag?"
