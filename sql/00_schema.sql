@@ -10,10 +10,11 @@
 -- ---------------------------------------------------------------------------
 -- Extensions
 --   * vector       - pgvector similarity search
---   * mage         - YugabyteDB's Apache AGE-compatible graph engine (2026.1+).
---                    Requires the gflag ysql_yb_enable_mage=true on master and
---                    tserver. MAGE lives under the `mag_catalog` schema (the
---                    YugabyteDB equivalent of upstream AGE's `ag_catalog`).
+--   * mage         - YugabyteDB's Apache AGE-compatible graph engine, a Tech
+--                    Preview feature from 2026.1 on. Turn it on with the flag
+--                    ysql_yb_enable_mage=true on the master and the tserver.
+--                    MAGE objects live in the `mag_catalog` schema, where
+--                    Apache AGE uses `ag_catalog`.
 -- ---------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS mage CASCADE;
@@ -39,10 +40,10 @@ CREATE INDEX IF NOT EXISTS doc_chunks_embedding_idx
 -- ---------------------------------------------------------------------------
 -- Graph store: a single named graph with Entity nodes and RELATED_TO edges.
 --
--- IMPORTANT MAGE quirks (YugabyteDB 2026.1):
---   * Put mag_catalog on the search_path and call create_graph / create_vlabel
---     / create_elabel UNQUALIFIED. Schema-qualifying the call (or wrapping it
---     in an explicit BEGIN/COMMIT) raises
+-- Two things to know about MAGE in Tech Preview:
+--   * Put mag_catalog on the search_path and call create_graph, create_vlabel,
+--     and create_elabel without a schema prefix. Prefixing the call, or
+--     wrapping it in BEGIN/COMMIT, fails with
 --     "Commit separate ddl txn called when not in a separate DDL transaction".
 --   * Graph names must be at least 3 characters.
 -- ---------------------------------------------------------------------------
