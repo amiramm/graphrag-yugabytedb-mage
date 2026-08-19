@@ -16,6 +16,12 @@ ARG YB_TARBALL
 ENV YB_HOME=/home/yugabyte
 WORKDIR $YB_HOME
 
+# Fail loudly: an unset YB_TARBALL otherwise surfaces as a confusing tar error.
+RUN test -n "$YB_TARBALL" || { \
+      echo "ERROR: --build-arg YB_TARBALL=<tarball-in-db/> is required; see db/README.md" >&2; \
+      exit 1; \
+    }
+
 # Runtime deps (mirrors the official yugabytedb/yugabyte image).
 RUN dnf install -y \
       bind-utils \

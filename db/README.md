@@ -16,9 +16,12 @@ on Docker Hub yet (this demo was originally proven against the pre-GA
 
 ## Building from a tarball
 
-The tarball is **not** committed to this repo (~500 MB). Place it here first.
-For YugabyteDB engineers, packaged releases live in the `releases.yugabyte.com`
-S3 bucket:
+The tarball is **not** committed to this repo (~500 MB). It must sit next to
+this file, in `db/`, because that directory is the build context and the
+Dockerfile's `COPY ${YB_TARBALL}` resolves relative to it. For YugabyteDB
+engineers, packaged releases live in the `releases.yugabyte.com` S3 bucket.
+
+Both commands below are run **from the repository root**:
 
 ```bash
 aws s3 cp \
@@ -26,12 +29,15 @@ aws s3 cp \
   db/
 ```
 
-Then build, passing the filename via the required `YB_TARBALL` build arg:
+Then build, passing the filename via the required `YB_TARBALL` build arg. Note
+`-f db/Dockerfile` with `db` as the build context:
 
 ```bash
 docker build --platform linux/arm64 \
+  -f db/Dockerfile \
   --build-arg YB_TARBALL=yugabyte-2026.1.1.1-b2-almalinux8-aarch64.tar.gz \
-  -t yb-graphrag:2026.1.1.1-b2 .
+  -t yb-graphrag:2026.1.1.1-b2 \
+  db
 ```
 
 Point compose at the result with `YB_IMAGE=yb-graphrag:2026.1.1.1-b2 docker
